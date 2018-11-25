@@ -70,7 +70,7 @@ public class Main {
         EntityManager em = emf.createEntityManager();
         EntityTransaction transaccion = em.getTransaction();
         Iterator iter = readSource.iterator();
-        int batchSize = 1000000;
+        int batchSize = 1000;
         String[] values;
         int i = 0;
         transaccion.begin();
@@ -80,7 +80,7 @@ public class Main {
             ct.setCedula(values[0]);
             ct.setApellidos(values[1]);
             ct.setNombres(values[2]);
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            SimpleDateFormat sdf = new SimpleDateFormat("yy-MM-dd");
             Date date = sdf.parse(values[3]);
             ct.setFechaNacimiento(date);
             ct.setCodProvincia(Integer.valueOf(values[4]));
@@ -88,7 +88,9 @@ public class Main {
             ct.setCodEstadoCivil(values[6]);            
             em.persist(ct);
             i++;
+            
             if (i % batchSize == 0) {
+                System.out.println(i);
                 em.flush();
                 em.clear();
                 transaccion.commit();
