@@ -1,5 +1,6 @@
 package ec.edu.espe.ac.mysqlmongoredis;
 
+import com.mongodb.MongoClient;
 import ec.edu.espe.ac.model.RegistroCivil;
 import java.io.File;
 import java.io.IOException;
@@ -16,6 +17,9 @@ import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
 import org.apache.commons.io.FileUtils;
 import javax.persistence.Persistence;
+import javax.persistence.TypedQuery;
+import org.mongodb.morphia.Datastore;
+import org.mongodb.morphia.Morphia;
 
 /**
  *
@@ -34,6 +38,7 @@ public class Main {
         Cargar();
         long end = System.currentTimeMillis();
         System.out.println("Insert en Mysql time: " + (end - start));
+      
 
     }
 
@@ -74,7 +79,7 @@ public class Main {
         String[] values;
         int i = 0;
         transaccion.begin();
-        while (iter.hasNext()) {            
+        while (iter.hasNext()) {
             RegistroCivil ct = new RegistroCivil();
             values = iter.next().toString().split(",");
             ct.setCedula(values[0]);
@@ -85,10 +90,10 @@ public class Main {
             ct.setFechaNacimiento(date);
             ct.setCodProvincia(Integer.valueOf(values[4]));
             ct.setGenero(values[5]);
-            ct.setCodEstadoCivil(values[6]);            
+            ct.setCodEstadoCivil(values[6]);
             em.persist(ct);
             i++;
-            
+
             if (i % batchSize == 0) {
                 System.out.println(i);
                 em.flush();
@@ -96,10 +101,28 @@ public class Main {
                 transaccion.commit();
                 transaccion.begin();
             }
-            
+
         }
+       
         transaccion.commit();
+        System.out.println("Insertando en mongo: ");
+        long start = System.currentTimeMillis();
+        Morphia morphia = new Morphia();
+        morphia.mapPackage("ec.edu.espe.ac.model.registroCivilM");
+        Datastore ds = morphia.createDatastore(new MongoClient(), "regCivil");
+        System.out.println("Conexion establecida");
+        try {
+            TypedQuery<RegistroCivil> consulta = em.createQuery("select p from RegistroCivil p", RegistroCivil.class);
+            List<RegistroCivil> lista = consulta.getResultList();
+            for (RegistroCivil e : lista) {
+                ds.save(e);
+                ds.ensureIndexes();
+            }            
+        } catch (Exception e) {
+            System.out.println("E: " + e);
+        }
+        long end = System.currentTimeMillis();
+        System.out.println("Insert en MongoDB time: " + (end - start));
         em.close();
     }
-
 }

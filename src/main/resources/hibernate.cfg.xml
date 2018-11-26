@@ -46,5 +46,6 @@ Contributor(s):
     <property name="hibernate.connection.url">jdbc:mysql://localhost:3307/regcivil?zeroDateTimeBehavior=convertToNull</property>
     <property name="hibernate.connection.username">root</property>
     <property name="hibernate.jdbc.batch_size">1000</property>
+    <mapping class="ec.edu.espe.ac.model.RegistroCivil"/>
   </session-factory>
 </hibernate-configuration>
