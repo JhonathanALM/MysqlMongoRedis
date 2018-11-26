@@ -2,6 +2,7 @@ package ec.edu.espe.ac.mysqlmongoredis;
 
 import com.mongodb.MongoClient;
 import ec.edu.espe.ac.model.RegistroCivil;
+import ec.edu.espe.ac.model.RegistroCivilM;
 import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
@@ -20,6 +21,8 @@ import javax.persistence.Persistence;
 import javax.persistence.TypedQuery;
 import org.mongodb.morphia.Datastore;
 import org.mongodb.morphia.Morphia;
+import org.mongodb.morphia.query.Query;
+import redis.clients.jedis.Jedis;
 
 /**
  *
@@ -27,22 +30,30 @@ import org.mongodb.morphia.Morphia;
  */
 public class Main {
 
+    private static final EntityManagerFactory emf = Persistence.createEntityManagerFactory("ec.edu.espe.ac_MysqlMongoRedis_jar_1PU");
+    private static final EntityManager em = emf.createEntityManager();
+    private static Datastore ds;
+    private static long tmongo, tmysql, tredis;
+
     public static void main(String[] args) throws ParseException {
         System.out.println("Deber: LechonJ - TambacoJ - PicoV");
-        System.out.println("Creacion BD");
-        Persistence.generateSchema("ec.edu.espe.ac_MysqlMongoRedis_jar_1PU", null);
-        System.out.println("Tiempos:---------------------------------------");
-        System.out.println("1: Insertar Archivo en Mysql");
-        StringBuilder sb = new StringBuilder();
+        System.out.println("Creacion BD en mysql");
         long start = System.currentTimeMillis();
-        Cargar();
+        Persistence.generateSchema("ec.edu.espe.ac_MysqlMongoRedis_jar_1PU", null);
+        Mysql();
+        mongo();
+        redis();
         long end = System.currentTimeMillis();
-        System.out.println("Insert en Mysql time: " + (end - start));
-      
-
+     
+        System.out.println("Tiempos:---------------------------------------"); 
+        System.out.println("Mysql: "+tmysql);
+        System.out.println("Mongo: "+tmongo);
+        System.out.println("Redis: "+tredis);
+        System.out.println("-----");
+        System.out.println("Total Procedimiento: "+ (end - start));
     }
 
-    public static void Cargar() throws ParseException {
+    public static void Mysql() throws ParseException {
         int cont = 1;
         String file = "c:\\tmp\\RegistroCivil.txt";
         System.out.println("Cargando archivo " + file);
@@ -55,7 +66,7 @@ public class Main {
         }
         if (readLines != null) {
             transferData(readLines);
-        };
+        }
         cont++;
     }
 
@@ -71,14 +82,14 @@ public class Main {
     }
 
     private static void transferData(List<String> readSource) throws ParseException {
-        EntityManagerFactory emf = Persistence.createEntityManagerFactory("ec.edu.espe.ac_MysqlMongoRedis_jar_1PU");
-        EntityManager em = emf.createEntityManager();
+
         EntityTransaction transaccion = em.getTransaction();
         Iterator iter = readSource.iterator();
         int batchSize = 1000;
         String[] values;
         int i = 0;
         transaccion.begin();
+        long start = System.currentTimeMillis();
         while (iter.hasNext()) {
             RegistroCivil ct = new RegistroCivil();
             values = iter.next().toString().split(",");
@@ -103,26 +114,48 @@ public class Main {
             }
 
         }
-       
+
         transaccion.commit();
+        long end = System.currentTimeMillis();
+        tmysql=end - start;
+    }
+
+    public static void mongo() {
         System.out.println("Insertando en mongo: ");
-        long start = System.currentTimeMillis();
         Morphia morphia = new Morphia();
         morphia.mapPackage("ec.edu.espe.ac.model.registroCivilM");
-        Datastore ds = morphia.createDatastore(new MongoClient(), "regCivil");
+        ds = morphia.createDatastore(new MongoClient(), "regCivil");
         System.out.println("Conexion establecida");
         try {
             TypedQuery<RegistroCivil> consulta = em.createQuery("select p from RegistroCivil p", RegistroCivil.class);
             List<RegistroCivil> lista = consulta.getResultList();
+            long start = System.currentTimeMillis();
             for (RegistroCivil e : lista) {
                 ds.save(e);
                 ds.ensureIndexes();
-            }            
+            }
+            long end = System.currentTimeMillis();
+            tmongo =end - start;
+
         } catch (Exception e) {
             System.out.println("E: " + e);
         }
-        long end = System.currentTimeMillis();
-        System.out.println("Insert en MongoDB time: " + (end - start));
         em.close();
     }
+
+    public static void redis() {
+        //Connecting to Redis server on localhost 
+        Jedis jedis = new Jedis("localhost");
+        System.out.println("Insertando en redis");
+        Query<RegistroCivil> query = ds.createQuery(RegistroCivil.class);
+        List<RegistroCivil> reg = query.asList();
+        long start = System.currentTimeMillis();
+        for (RegistroCivil e : reg) {
+            jedis.set(e.getCedula(), e.toString());
+        }
+        long end = System.currentTimeMillis();
+        tredis= end - start;
+
+    }
+
 }

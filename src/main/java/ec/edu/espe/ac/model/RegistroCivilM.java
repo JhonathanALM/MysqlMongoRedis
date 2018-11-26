@@ -7,7 +7,7 @@ import org.mongodb.morphia.annotations.Entity;
 import org.mongodb.morphia.annotations.Id;
 import org.mongodb.morphia.annotations.Property;
 
-@Entity(noClassnameStored =true , value="regCivil")
+@Entity(noClassnameStored =true , value="Registrocivil")
 public class RegistroCivilM implements Serializable {
     @Id
     @Property("cedula")
