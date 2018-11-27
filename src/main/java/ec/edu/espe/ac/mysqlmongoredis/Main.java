@@ -1,6 +1,8 @@
 package ec.edu.espe.ac.mysqlmongoredis;
 
+import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
+import com.mongodb.WriteConcern;
 import ec.edu.espe.ac.model.RegistroCivil;
 import ec.edu.espe.ac.model.RegistroCivilM;
 import java.io.File;
@@ -23,6 +25,7 @@ import org.mongodb.morphia.Datastore;
 import org.mongodb.morphia.Morphia;
 import org.mongodb.morphia.query.Query;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Pipeline;
 
 /**
  *
@@ -44,13 +47,13 @@ public class Main {
         mongo();
         redis();
         long end = System.currentTimeMillis();
-     
-        System.out.println("Tiempos:---------------------------------------"); 
-        System.out.println("Mysql: "+tmysql);
-        System.out.println("Mongo: "+tmongo);
-        System.out.println("Redis: "+tredis);
+
+        System.out.println("Tiempos:---------------------------------------");
+        System.out.println("Mysql: " + tmysql);
+        System.out.println("Mongo: " + tmongo);
+        System.out.println("Redis: " + tredis);
         System.out.println("-----");
-        System.out.println("Total Procedimiento: "+ (end - start));
+        System.out.println("Total Procedimiento: " + (end - start));
     }
 
     public static void Mysql() throws ParseException {
@@ -117,7 +120,7 @@ public class Main {
 
         transaccion.commit();
         long end = System.currentTimeMillis();
-        tmysql=end - start;
+        tmysql = end - start;
     }
 
     public static void mongo() {
@@ -126,16 +129,18 @@ public class Main {
         morphia.mapPackage("ec.edu.espe.ac.model.registroCivilM");
         ds = morphia.createDatastore(new MongoClient(), "regCivil");
         System.out.println("Conexion establecida");
+        final List<DBObject> dbObjects = new ArrayList<DBObject>();
         try {
             TypedQuery<RegistroCivil> consulta = em.createQuery("select p from RegistroCivil p", RegistroCivil.class);
             List<RegistroCivil> lista = consulta.getResultList();
-            long start = System.currentTimeMillis();
-            for (RegistroCivil e : lista) {
-                ds.save(e);
-                ds.ensureIndexes();
+            for (RegistroCivil object : lista) {
+                dbObjects.add(morphia.toDBObject(object));
             }
+            long start = System.currentTimeMillis();
+            ds.getCollection(RegistroCivil.class).insert(dbObjects);
+            //ds.save(lista);
             long end = System.currentTimeMillis();
-            tmongo =end - start;
+            tmongo = end - start;
 
         } catch (Exception e) {
             System.out.println("E: " + e);
@@ -149,12 +154,13 @@ public class Main {
         System.out.println("Insertando en redis");
         Query<RegistroCivil> query = ds.createQuery(RegistroCivil.class);
         List<RegistroCivil> reg = query.asList();
+        Pipeline pipeline = jedis.pipelined();
         long start = System.currentTimeMillis();
         for (RegistroCivil e : reg) {
-            jedis.set(e.getCedula(), e.toString());
+            pipeline.sadd(e.getCedula(), e.toString());
         }
         long end = System.currentTimeMillis();
-        tredis= end - start;
+        tredis = end - start;
 
     }
 
