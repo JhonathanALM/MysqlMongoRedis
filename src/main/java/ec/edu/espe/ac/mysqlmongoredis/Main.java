@@ -58,7 +58,7 @@ public class Main {
 
     public static void Mysql() throws ParseException {
         int cont = 1;
-        String file = "c:\\tmp\\RegistroCivil.txt";
+        String file = "c:\\tmp\\registroCivil.txt";
         System.out.println("Cargando archivo " + file);
         File fileMora = new File(file);
         List<String> readLines = new ArrayList<String>();
@@ -109,7 +109,9 @@ public class Main {
             i++;
 
             if (i % batchSize == 0) {
-                System.out.println(i);
+                if (i % 100000 == 0) {
+                    System.out.println(i / 10000 + "  %");
+                }
                 em.flush();
                 em.clear();
                 transaccion.commit();
@@ -128,20 +130,27 @@ public class Main {
         Morphia morphia = new Morphia();
         morphia.mapPackage("ec.edu.espe.ac.model.registroCivilM");
         ds = morphia.createDatastore(new MongoClient(), "regCivil");
+
         System.out.println("Conexion establecida");
-        final List<DBObject> dbObjects = new ArrayList<DBObject>();
+        List<DBObject> dbObjects = new ArrayList<DBObject>();
+
         try {
             TypedQuery<RegistroCivil> consulta = em.createQuery("select p from RegistroCivil p", RegistroCivil.class);
             List<RegistroCivil> lista = consulta.getResultList();
+            int i=0;
             for (RegistroCivil object : lista) {
                 dbObjects.add(morphia.toDBObject(object));
+                i++;
+            if (i % 100000== 0) {
+                    System.out.println(i / 10000 + "%");
+                }
             }
             long start = System.currentTimeMillis();
+            System.out.println("insertando...");
             ds.getCollection(RegistroCivil.class).insert(dbObjects);
             //ds.save(lista);
             long end = System.currentTimeMillis();
             tmongo = end - start;
-
         } catch (Exception e) {
             System.out.println("E: " + e);
         }
@@ -151,16 +160,25 @@ public class Main {
     public static void redis() {
         //Connecting to Redis server on localhost 
         Jedis jedis = new Jedis("localhost");
+        jedis.flushDB();
         System.out.println("Insertando en redis");
         Query<RegistroCivil> query = ds.createQuery(RegistroCivil.class);
         List<RegistroCivil> reg = query.asList();
         Pipeline pipeline = jedis.pipelined();
         long start = System.currentTimeMillis();
+        int i = 0;
         for (RegistroCivil e : reg) {
-            pipeline.sadd(e.getCedula(), e.toString());
+           // pipeline.sadd(e.getCedula(), e.toString());
+            jedis.set(e.getCedula(), e.toString());
+            i++;
+            if (i % 100000== 0) {
+                    System.out.println(i / 10000 + "%");
+                }
         }
         long end = System.currentTimeMillis();
         tredis = end - start;
+        //jedis.close();
+        //pipeline.close();
 
     }
 
